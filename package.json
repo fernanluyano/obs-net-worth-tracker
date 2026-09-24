@@ -1,0 +1,25 @@
+{
+	"name": "net-worth-tracker",
+	"version": "0.1.0",
+	"description": "Track net worth, accounts, and budget over time, right inside your vault.",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"test": "vitest run"
+	},
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^20.14.2",
+		"@types/tabulator-tables": "^6.3.6",
+		"esbuild": "0.21.5",
+		"obsidian": "latest",
+		"tslib": "2.6.2",
+		"typescript": "5.4.5",
+		"vitest": "^2.1.9"
+	},
+	"dependencies": {
+		"chart.js": "^4.5.1",
+		"tabulator-tables": "^6.5.3"
+	}
+}
