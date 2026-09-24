@@ -13,7 +13,7 @@ typecheck:
 	npx tsc -noEmit -skipLibCheck
 
 test:
-	npx vitest run
+	npx vitest run --passWithNoTests --coverage
 
 test-watch:
 	npx vitest
@@ -31,7 +31,7 @@ help:
 	@echo "  dev         Build main.ts and watch for changes (unminified, sourcemaps)"
 	@echo "  build       Typecheck then produce a minified production main.js"
 	@echo "  typecheck   Run tsc -noEmit over the project"
-	@echo "  test        Run the vitest test suite once"
+	@echo "  test        Run the vitest test suite once, with coverage (fails below 50%)"
 	@echo "  test-watch  Run vitest in watch mode"
 	@echo "  clean       Remove build output (main.js, main.js.map)"
 	@echo "  release     Prompt for a version bump, then build, test, commit, tag, and publish"

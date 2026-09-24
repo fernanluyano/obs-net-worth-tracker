@@ -6,12 +6,13 @@
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-		"test": "vitest run"
+		"test": "vitest run --passWithNoTests --coverage"
 	},
 	"license": "MIT",
 	"devDependencies": {
 		"@types/node": "^20.14.2",
 		"@types/tabulator-tables": "^6.3.6",
+		"@vitest/coverage-v8": "^2.1.9",
 		"esbuild": "0.21.5",
 		"obsidian": "latest",
 		"tslib": "2.6.2",
