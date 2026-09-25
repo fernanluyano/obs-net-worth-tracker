@@ -1,18 +1,20 @@
 import { Plugin, WorkspaceLeaf } from "obsidian";
 import { NetWorthView, VIEW_TYPE_NET_WORTH } from "./view";
+import type { Account, Snapshot } from "./accounts";
 import type { BudgetCategory } from "./budgetCategories";
-
-// Bump whenever the persisted shape below changes, and add a migration
-// function at that point — there's nothing to migrate from yet at v1.
-const CURRENT_SCHEMA_VERSION = 1;
+import { CURRENT_SCHEMA_VERSION, migrateToV2, type LegacyPluginDataV1 } from "./migrations";
 
 interface PluginData {
 	schemaVersion: number;
 	categories: BudgetCategory[];
+	accounts: Account[];
+	snapshots: Snapshot[];
 }
 
 export default class NetWorthTrackerPlugin extends Plugin {
 	categories: BudgetCategory[] = [];
+	accounts: Account[] = [];
+	snapshots: Snapshot[] = [];
 
 	async onload(): Promise<void> {
 		await this.loadPluginData();
@@ -47,7 +49,22 @@ export default class NetWorthTrackerPlugin extends Plugin {
 
 	async loadPluginData(): Promise<void> {
 		const data = ((await this.loadData()) ?? {}) as Partial<PluginData>;
-		this.categories = data.categories ?? [];
+		const schemaVersion = data.schemaVersion ?? 1;
+
+		if (schemaVersion >= CURRENT_SCHEMA_VERSION) {
+			this.categories = data.categories ?? [];
+			this.accounts = data.accounts ?? [];
+			this.snapshots = data.snapshots ?? [];
+			return;
+		}
+
+		const migrated = migrateToV2(data as LegacyPluginDataV1);
+		this.categories = migrated.categories;
+		this.accounts = migrated.accounts;
+		this.snapshots = migrated.snapshots;
+		// Persist immediately so a vault re-opened without being edited still
+		// ends up migrated instead of stuck on the old shape.
+		await this.persist();
 	}
 
 	async saveCategories(categories: BudgetCategory[]): Promise<void> {
@@ -55,10 +72,17 @@ export default class NetWorthTrackerPlugin extends Plugin {
 		await this.persist();
 	}
 
+	async saveAccounts(accounts: Account[]): Promise<void> {
+		this.accounts = accounts;
+		await this.persist();
+	}
+
 	private async persist(): Promise<void> {
 		const data: PluginData = {
 			schemaVersion: CURRENT_SCHEMA_VERSION,
 			categories: this.categories,
+			accounts: this.accounts,
+			snapshots: this.snapshots,
 		};
 		await this.saveData(data);
 	}

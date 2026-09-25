@@ -228,10 +228,39 @@
 	justify-content: flex-end;
 }
 
+/* Overview tab */
+
+.nwt-net-worth-total {
+	font-size: var(--font-ui-larger);
+	font-weight: 600;
+	margin: 0;
+}
+
 /* Assets tab */
 
-.nwt-assets-grid {
-	display: grid;
-	gap: var(--size-4-4);
-	grid-template-columns: 1fr 1fr;
+.nwt-account-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-2);
+}
+
+.nwt-account {
+	align-items: center;
+	display: flex;
+	justify-content: space-between;
+	padding: var(--size-4-1) 0;
+}
+
+.nwt-account:not(:last-child) {
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.nwt-account-name {
+	font-weight: 600;
+}
+
+.nwt-account-kind {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	text-transform: capitalize;
 }

@@ -1,4 +1,5 @@
 import { App, ItemView, Modal, setIcon, setTooltip, WorkspaceLeaf } from "obsidian";
+import { addAccount, formatCents, netWorthAt, type Account, type AccountKind } from "./accounts";
 import {
 	addCategory,
 	addSubcategory,
@@ -11,6 +12,10 @@ import {
 import type NetWorthTrackerPlugin from "./main";
 
 export const VIEW_TYPE_NET_WORTH = "net-worth-tracker-view";
+
+function todayIso(): string {
+	return new Date().toISOString().slice(0, 10);
+}
 
 type TabId = "overview" | "budget" | "debt" | "assets";
 
@@ -102,8 +107,23 @@ export class NetWorthView extends ItemView {
 			const section = root.createDiv({ cls: "nwt-section" });
 			section.createDiv({ cls: "nwt-section-header", text: title });
 			const card = section.createDiv({ cls: "nwt-card" });
+
+			if (title === "Net Worth") {
+				this.renderNetWorthCard(card);
+				continue;
+			}
+
 			card.createEl("p", { cls: "nwt-placeholder", text: "Nothing tracked yet." });
 		}
+	}
+
+	private renderNetWorthCard(card: HTMLElement): void {
+		if (this.plugin.snapshots.length === 0) {
+			card.createEl("p", { cls: "nwt-placeholder", text: "Nothing tracked yet." });
+			return;
+		}
+		const total = netWorthAt(this.plugin.accounts, this.plugin.snapshots, todayIso());
+		card.createEl("p", { cls: "nwt-net-worth-total", text: formatCents(total) });
 	}
 
 	// ---------------------------------------------------------------------
@@ -235,17 +255,35 @@ export class NetWorthView extends ItemView {
 	private renderAssetsTab(root: HTMLElement): void {
 		const header = root.createDiv({ cls: "nwt-section-header nwt-assets-header" });
 		header.createSpan({ text: "Assets" });
-		// Present but inert — no handlers until real add/refresh logic exists.
 		const actions = header.createDiv({ cls: "nwt-header-actions" });
-		actions.createEl("button", { cls: "nwt-btn", text: "+ Add" });
+		actions.createEl("button", { cls: "nwt-btn", text: "+ Add" }).addEventListener("click", () => {
+			new AddAccountModal(this.app, (name, kind) => {
+				void this.plugin.saveAccounts(addAccount(this.plugin.accounts, name, kind)).then(() => this.render());
+			}).open();
+		});
+		// Present but inert — nothing external to refresh from yet.
 		actions.createEl("button", { cls: "nwt-btn", text: "Refresh" });
 
-		const grid = root.createDiv({ cls: "nwt-assets-grid" });
-		grid.createDiv({ cls: "nwt-card" }).createEl("p", { cls: "nwt-placeholder", text: "No savings tracked yet." });
-		grid.createDiv({ cls: "nwt-card" }).createEl("p", {
-			cls: "nwt-placeholder",
-			text: "No other assets tracked yet.",
-		});
+		const accounts = this.plugin.accounts.filter((account) => !account.archived);
+		if (accounts.length === 0) {
+			root.createDiv({ cls: "nwt-card" }).createEl("p", {
+				cls: "nwt-placeholder",
+				text: "No accounts tracked yet.",
+			});
+			return;
+		}
+
+		const list = root.createDiv({ cls: "nwt-card nwt-account-list" });
+		for (const account of accounts) {
+			this.renderAccountRow(list, account);
+		}
+	}
+
+	private renderAccountRow(root: HTMLElement, account: Account): void {
+		const row = root.createDiv({ cls: "nwt-account" });
+		row.createSpan({ cls: "nwt-account-name", text: account.name });
+		const meta = account.subtype ? `${account.kind} · ${account.subtype}` : account.kind;
+		row.createSpan({ cls: "nwt-account-kind", text: meta });
 	}
 
 	// ---------------------------------------------------------------------
@@ -301,6 +339,54 @@ class PromptModal extends Modal {
 		if (!this.value.trim()) return;
 		this.close();
 		this.onSubmit(this.value);
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
+	}
+}
+
+class AddAccountModal extends Modal {
+	private name = "";
+	private kind: AccountKind = "asset";
+
+	constructor(
+		app: App,
+		private onSubmit: (name: string, kind: AccountKind) => void
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		this.contentEl.createEl("h3", { text: "New account" });
+
+		const input = this.contentEl.createEl("input", { type: "text", cls: "nwt-modal-input" });
+		input.placeholder = "e.g. Checking";
+		input.addEventListener("input", () => {
+			this.name = input.value;
+		});
+		input.addEventListener("keydown", (evt) => {
+			if (evt.key === "Enter") this.submit();
+		});
+
+		const select = this.contentEl.createEl("select", { cls: "nwt-modal-input" });
+		select.createEl("option", { value: "asset", text: "Asset" });
+		select.createEl("option", { value: "liability", text: "Liability" });
+		select.addEventListener("change", () => {
+			this.kind = select.value as AccountKind;
+		});
+
+		const buttonRow = this.contentEl.createDiv({ cls: "nwt-modal-buttons" });
+		buttonRow.createEl("button", { text: "Cancel" }).addEventListener("click", () => this.close());
+		buttonRow.createEl("button", { text: "Save", cls: "mod-cta" }).addEventListener("click", () => this.submit());
+
+		input.focus();
+	}
+
+	private submit(): void {
+		if (!this.name.trim()) return;
+		this.close();
+		this.onSubmit(this.name, this.kind);
 	}
 
 	onClose(): void {
