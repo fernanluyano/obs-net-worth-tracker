@@ -118,6 +118,37 @@ export function netWorthAt(accounts: Account[], snapshots: Snapshot[], date: str
 	return totalCents;
 }
 
+export interface AssetTypeBreakdown {
+	type: AssetAccountType;
+	label: string;
+	totalCents: number;
+}
+
+// Same latest-snapshot-per-account logic as netWorthAt, grouped by asset type
+// instead of summed into one total. An untyped account folds into the same
+// "Other" bucket as an explicit type "other" — both are the catch-all slice.
+// Fixed output order (ACCOUNT_TYPES_BY_KIND.asset's order) regardless of which
+// types are actually present, so a type's chart color never depends on what
+// else is in the breakdown.
+export function assetBreakdownByType(accounts: Account[], snapshots: Snapshot[], date: string): AssetTypeBreakdown[] {
+	const totals = new Map<AssetAccountType, number>();
+	for (const account of accounts) {
+		if (account.kind !== "asset") continue;
+		const latest = latestSnapshotOnOrBefore(snapshots, account.id, date);
+		if (!latest) continue;
+		const type = (account.type ?? "other") as AssetAccountType;
+		totals.set(type, (totals.get(type) ?? 0) + latest.balanceCents);
+	}
+	return ACCOUNT_TYPES_BY_KIND.asset
+		.map((option) => ({
+			type: option.value as AssetAccountType,
+			label: option.label,
+			totalCents: totals.get(option.value as AssetAccountType) ?? 0,
+		}))
+		.filter((entry) => entry.totalCents !== 0)
+		.sort((a, b) => b.totalCents - a.totalCents);
+}
+
 export function formatCents(cents: number): string {
 	const formatted = (Math.abs(cents) / 100).toLocaleString(undefined, {
 		minimumFractionDigits: 2,

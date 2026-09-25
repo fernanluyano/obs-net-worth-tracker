@@ -236,6 +236,12 @@
 	margin: 0;
 }
 
+.nwt-chart-canvas-wrap {
+	height: 220px;
+	position: relative;
+	width: 100%;
+}
+
 /* Assets tab */
 
 .nwt-account-list {

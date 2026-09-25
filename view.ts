@@ -1,5 +1,15 @@
+import { ArcElement, Chart, DoughnutController, Legend, Tooltip } from "chart.js";
 import { App, ItemView, Modal, setIcon, setTooltip, WorkspaceLeaf } from "obsidian";
-import { accountTypeLabel, addAccount, formatCents, netWorthAt, type Account, type AccountKind } from "./accounts";
+import {
+	accountTypeLabel,
+	addAccount,
+	assetBreakdownByType,
+	formatCents,
+	netWorthAt,
+	type Account,
+	type AccountKind,
+	type AssetAccountType,
+} from "./accounts";
 import {
 	addCategory,
 	addSubcategory,
@@ -11,7 +21,21 @@ import {
 } from "./budgetCategories";
 import type NetWorthTrackerPlugin from "./main";
 
+Chart.register(DoughnutController, ArcElement, Legend, Tooltip);
+
 export const VIEW_TYPE_NET_WORTH = "net-worth-tracker-view";
+
+// Validated categorical palette (dataviz skill), fixed to ACCOUNT_TYPES_BY_KIND.asset's
+// order so a type's color never depends on which other types are present.
+const ASSET_TYPE_COLORS: Record<AssetAccountType, { light: string; dark: string }> = {
+	cash: { light: "#2a78d6", dark: "#3987e5" },
+	"real-estate": { light: "#eb6834", dark: "#d95926" },
+	"precious-metals": { light: "#1baf7a", dark: "#199e70" },
+	retirement: { light: "#eda100", dark: "#c98500" },
+	investments: { light: "#e87ba4", dark: "#d55181" },
+	vehicle: { light: "#008300", dark: "#008300" },
+	other: { light: "#4a3aa7", dark: "#9085e9" },
+};
 
 function todayIso(): string {
 	return new Date().toISOString().slice(0, 10);
@@ -31,6 +55,7 @@ export class NetWorthView extends ItemView {
 	// Overview leads, not Budget (the trading app's default) — the net worth
 	// view should be the first thing shown, not buried behind navigation.
 	private activeTab: TabId = "overview";
+	private charts: Chart[] = [];
 
 	constructor(leaf: WorkspaceLeaf, plugin: NetWorthTrackerPlugin) {
 		super(leaf);
@@ -54,16 +79,23 @@ export class NetWorthView extends ItemView {
 	}
 
 	async onClose(): Promise<void> {
+		this.destroyCharts();
 		this.contentEl.empty();
 	}
 
 	private render(): void {
+		this.destroyCharts();
 		const root = this.contentEl;
 		root.empty();
 		root.addClass("nwt-view");
 
 		this.renderTabBar(root);
 		this.renderActiveTab(root);
+	}
+
+	private destroyCharts(): void {
+		for (const chart of this.charts) chart.destroy();
+		this.charts = [];
 	}
 
 	private renderTabBar(root: HTMLElement): void {
@@ -112,6 +144,10 @@ export class NetWorthView extends ItemView {
 				this.renderNetWorthCard(card);
 				continue;
 			}
+			if (title === "Assets") {
+				this.renderAssetBreakdownCard(card);
+				continue;
+			}
 
 			card.createEl("p", { cls: "nwt-placeholder", text: "Nothing tracked yet." });
 		}
@@ -124,6 +160,48 @@ export class NetWorthView extends ItemView {
 		}
 		const total = netWorthAt(this.plugin.accounts, this.plugin.snapshots, todayIso());
 		card.createEl("p", { cls: "nwt-net-worth-total", text: formatCents(total) });
+	}
+
+	private renderAssetBreakdownCard(card: HTMLElement): void {
+		const breakdown = assetBreakdownByType(this.plugin.accounts, this.plugin.snapshots, todayIso());
+		if (breakdown.length === 0) {
+			card.createEl("p", { cls: "nwt-placeholder", text: "Nothing tracked yet." });
+			return;
+		}
+
+		const wrap = card.createDiv({ cls: "nwt-chart-canvas-wrap" });
+		const canvas = wrap.createEl("canvas");
+		const isDark = document.body.classList.contains("theme-dark");
+		const textColor = getComputedStyle(card).getPropertyValue("--text-normal").trim() || "#222222";
+
+		this.charts.push(
+			new Chart(canvas, {
+				type: "doughnut",
+				data: {
+					labels: breakdown.map((entry) => entry.label),
+					datasets: [
+						{
+							data: breakdown.map((entry) => entry.totalCents),
+							backgroundColor: breakdown.map((entry) =>
+								isDark ? ASSET_TYPE_COLORS[entry.type].dark : ASSET_TYPE_COLORS[entry.type].light
+							),
+							borderWidth: 0,
+						},
+					],
+				},
+				options: {
+					maintainAspectRatio: false,
+					plugins: {
+						legend: { position: "right", labels: { color: textColor } },
+						tooltip: {
+							callbacks: {
+								label: (ctx) => `${ctx.label}: ${formatCents(breakdown[ctx.dataIndex].totalCents)}`,
+							},
+						},
+					},
+				},
+			})
+		);
 	}
 
 	// ---------------------------------------------------------------------

@@ -15,7 +15,7 @@ TypeScript, esbuild (bundles `main.ts` -> `main.js`, CJS, `obsidian`/`electron`/
 - `make test` / `make test-watch` — vitest
 - `make release` — interactive: bump version in `manifest.json`/`package.json`/`versions.json`, build, test, commit, tag, push, watch CI, publish the GitHub release
 
-Or run the underlying `npm run <script>` / `npx vitest` directly.
+Prefer these `make` targets over the underlying `npm run <script>` / `npx vitest` — only drop to the raw command when a target doesn't cover what you need.
 
 ## Structure
 

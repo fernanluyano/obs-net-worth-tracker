@@ -3,6 +3,7 @@ import {
 	accountTypeLabel,
 	addAccount,
 	archiveAccount,
+	assetBreakdownByType,
 	formatCents,
 	isValidAccountType,
 	netWorthAt,
@@ -220,6 +221,88 @@ describe("accountTypeLabel", () => {
 
 	it("returns undefined for a type that doesn't belong to the given kind", () => {
 		expect(accountTypeLabel("asset", "mortgage")).toBeUndefined();
+	});
+});
+
+describe("assetBreakdownByType", () => {
+	it("is empty with no accounts", () => {
+		expect(assetBreakdownByType([], [], "2026-01-01")).toEqual([]);
+	});
+
+	it("groups a single typed account under its type", () => {
+		const accounts = addAccount([], "Checking", "asset", "cash");
+		const snapshots = recordSnapshot([], accounts[0].id, "2026-01-01", 100000);
+		expect(assetBreakdownByType(accounts, snapshots, "2026-01-01")).toEqual([
+			{ type: "cash", label: "Cash/Bank", totalCents: 100000 },
+		]);
+	});
+
+	it("sums multiple accounts of the same type into one slice", () => {
+		let accounts = addAccount([], "Checking", "asset", "cash");
+		accounts = addAccount(accounts, "Savings", "asset", "cash");
+		let snapshots = recordSnapshot([], accounts[0].id, "2026-01-01", 100000);
+		snapshots = recordSnapshot(snapshots, accounts[1].id, "2026-01-01", 50000);
+		expect(assetBreakdownByType(accounts, snapshots, "2026-01-01")).toEqual([
+			{ type: "cash", label: "Cash/Bank", totalCents: 150000 },
+		]);
+	});
+
+	it("folds an untyped account into the Other bucket", () => {
+		const accounts = addAccount([], "Mystery Fund", "asset");
+		const snapshots = recordSnapshot([], accounts[0].id, "2026-01-01", 20000);
+		expect(assetBreakdownByType(accounts, snapshots, "2026-01-01")).toEqual([
+			{ type: "other", label: "Other", totalCents: 20000 },
+		]);
+	});
+
+	it("merges an untyped account with an explicitly-typed 'other' account", () => {
+		let accounts = addAccount([], "Mystery Fund", "asset");
+		accounts = addAccount(accounts, "Misc Asset", "asset", "other");
+		let snapshots = recordSnapshot([], accounts[0].id, "2026-01-01", 20000);
+		snapshots = recordSnapshot(snapshots, accounts[1].id, "2026-01-01", 5000);
+		expect(assetBreakdownByType(accounts, snapshots, "2026-01-01")).toEqual([
+			{ type: "other", label: "Other", totalCents: 25000 },
+		]);
+	});
+
+	it("excludes liability accounts entirely", () => {
+		const accounts = addAccount([], "Mortgage", "liability");
+		const snapshots = recordSnapshot([], accounts[0].id, "2026-01-01", 300000);
+		expect(assetBreakdownByType(accounts, snapshots, "2026-01-01")).toEqual([]);
+	});
+
+	it("excludes a type with no balance at the given date", () => {
+		const accounts = addAccount([], "Checking", "asset", "cash");
+		expect(assetBreakdownByType(accounts, [], "2026-01-01")).toEqual([]);
+	});
+
+	it("sorts slices by total descending", () => {
+		let accounts = addAccount([], "Checking", "asset", "cash");
+		accounts = addAccount(accounts, "House", "asset", "real-estate");
+		let snapshots = recordSnapshot([], accounts[0].id, "2026-01-01", 50000);
+		snapshots = recordSnapshot(snapshots, accounts[1].id, "2026-01-01", 500000);
+		expect(assetBreakdownByType(accounts, snapshots, "2026-01-01").map((entry) => entry.type)).toEqual([
+			"real-estate",
+			"cash",
+		]);
+	});
+
+	it("still counts an archived account's last known balance, matching netWorthAt", () => {
+		let accounts = addAccount([], "Old 401k", "asset", "retirement");
+		const snapshots = recordSnapshot([], accounts[0].id, "2026-01-01", 40000);
+		accounts = archiveAccount(accounts, accounts[0].id);
+		expect(assetBreakdownByType(accounts, snapshots, "2026-06-01")).toEqual([
+			{ type: "retirement", label: "Retirement", totalCents: 40000 },
+		]);
+	});
+
+	it("uses the latest snapshot on or before the given date", () => {
+		const accounts = addAccount([], "Checking", "asset", "cash");
+		let snapshots = recordSnapshot([], accounts[0].id, "2026-01-01", 100000);
+		snapshots = recordSnapshot(snapshots, accounts[0].id, "2026-03-01", 150000);
+		expect(assetBreakdownByType(accounts, snapshots, "2026-02-01")).toEqual([
+			{ type: "cash", label: "Cash/Bank", totalCents: 100000 },
+		]);
 	});
 });
 
