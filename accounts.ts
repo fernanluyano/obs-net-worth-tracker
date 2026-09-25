@@ -1,10 +1,52 @@
 export type AccountKind = "asset" | "liability";
 
+export type AssetAccountType =
+	| "cash"
+	| "real-estate"
+	| "precious-metals"
+	| "retirement"
+	| "investments"
+	| "vehicle"
+	| "other";
+
+export type LiabilityAccountType = "credit-card" | "mortgage" | "loan" | "other-liability";
+
+export type AccountType = AssetAccountType | LiabilityAccountType;
+
+// Single source of truth for which `type` values are valid for each `kind`,
+// and their display labels — both addAccount's validation and the Add
+// Account modal's dropdown read from this instead of duplicating the list.
+export const ACCOUNT_TYPES_BY_KIND: Record<AccountKind, { value: AccountType; label: string }[]> = {
+	asset: [
+		{ value: "cash", label: "Cash/Bank" },
+		{ value: "real-estate", label: "Real Estate" },
+		{ value: "precious-metals", label: "Precious Metals" },
+		{ value: "retirement", label: "Retirement" },
+		{ value: "investments", label: "Investments/Brokerage" },
+		{ value: "vehicle", label: "Vehicle" },
+		{ value: "other", label: "Other" },
+	],
+	liability: [
+		{ value: "credit-card", label: "Credit Card" },
+		{ value: "mortgage", label: "Mortgage" },
+		{ value: "loan", label: "Loan" },
+		{ value: "other-liability", label: "Other Liability" },
+	],
+};
+
+export function isValidAccountType(kind: AccountKind, type: AccountType): boolean {
+	return ACCOUNT_TYPES_BY_KIND[kind].some((option) => option.value === type);
+}
+
+export function accountTypeLabel(kind: AccountKind, type: AccountType): string | undefined {
+	return ACCOUNT_TYPES_BY_KIND[kind].find((option) => option.value === type)?.label;
+}
+
 export interface Account {
 	id: string;
 	name: string;
 	kind: AccountKind;
-	subtype?: string;
+	type?: AccountType;
 	archived: boolean;
 }
 
@@ -19,12 +61,11 @@ function generateId(): string {
 	return crypto.randomUUID();
 }
 
-export function addAccount(accounts: Account[], name: string, kind: AccountKind, subtype?: string): Account[] {
+export function addAccount(accounts: Account[], name: string, kind: AccountKind, type?: AccountType): Account[] {
 	const trimmed = name.trim();
 	if (!trimmed) return accounts;
 	const account: Account = { id: generateId(), name: trimmed, kind, archived: false };
-	const trimmedSubtype = subtype?.trim();
-	if (trimmedSubtype) account.subtype = trimmedSubtype;
+	if (type && isValidAccountType(kind, type)) account.type = type;
 	return [...accounts, account];
 }
 

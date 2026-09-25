@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+	accountTypeLabel,
 	addAccount,
 	archiveAccount,
 	formatCents,
+	isValidAccountType,
 	netWorthAt,
 	recordSnapshot,
 	renameAccount,
@@ -20,14 +22,19 @@ describe("addAccount", () => {
 		expect(result[0].id).toBeTruthy();
 	});
 
-	it("stores an optional subtype", () => {
-		const result = addAccount([], "Checking", "asset", "checking");
-		expect(result[0].subtype).toBe("checking");
+	it("stores a type valid for the given kind", () => {
+		const result = addAccount([], "Checking", "asset", "cash");
+		expect(result[0].type).toBe("cash");
 	});
 
-	it("omits subtype when blank", () => {
-		const result = addAccount([], "Checking", "asset", "   ");
-		expect(result[0].subtype).toBeUndefined();
+	it("omits a type that isn't valid for the given kind", () => {
+		const result = addAccount([], "Mortgage", "liability", "cash");
+		expect(result[0].type).toBeUndefined();
+	});
+
+	it("omits type when none is given", () => {
+		const result = addAccount([], "Checking", "asset");
+		expect(result[0].type).toBeUndefined();
 	});
 
 	it("trims whitespace from the name", () => {
@@ -185,6 +192,34 @@ describe("netWorthAt", () => {
 		const renamed = renameAccount(accounts, accounts[0].id, "Primary Checking");
 		expect(netWorthAt(renamed, snapshots, "2026-01-01")).toBe(100000);
 		expect(snapshots[0].accountId).toBe(renamed[0].id);
+	});
+});
+
+describe("isValidAccountType", () => {
+	it("accepts an asset type for kind asset", () => {
+		expect(isValidAccountType("asset", "retirement")).toBe(true);
+	});
+
+	it("rejects a liability type for kind asset", () => {
+		expect(isValidAccountType("asset", "mortgage")).toBe(false);
+	});
+
+	it("accepts a liability type for kind liability", () => {
+		expect(isValidAccountType("liability", "mortgage")).toBe(true);
+	});
+
+	it("rejects an asset type for kind liability", () => {
+		expect(isValidAccountType("liability", "retirement")).toBe(false);
+	});
+});
+
+describe("accountTypeLabel", () => {
+	it("returns the display label for a valid kind/type pair", () => {
+		expect(accountTypeLabel("asset", "real-estate")).toBe("Real Estate");
+	});
+
+	it("returns undefined for a type that doesn't belong to the given kind", () => {
+		expect(accountTypeLabel("asset", "mortgage")).toBeUndefined();
 	});
 });
 

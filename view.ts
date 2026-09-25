@@ -1,5 +1,5 @@
 import { App, ItemView, Modal, setIcon, setTooltip, WorkspaceLeaf } from "obsidian";
-import { addAccount, formatCents, netWorthAt, type Account, type AccountKind } from "./accounts";
+import { accountTypeLabel, addAccount, formatCents, netWorthAt, type Account, type AccountKind } from "./accounts";
 import {
 	addCategory,
 	addSubcategory,
@@ -282,7 +282,8 @@ export class NetWorthView extends ItemView {
 	private renderAccountRow(root: HTMLElement, account: Account): void {
 		const row = root.createDiv({ cls: "nwt-account" });
 		row.createSpan({ cls: "nwt-account-name", text: account.name });
-		const meta = account.subtype ? `${account.kind} · ${account.subtype}` : account.kind;
+		const typeLabel = account.type ? accountTypeLabel(account.kind, account.type) : undefined;
+		const meta = typeLabel ? `${account.kind} · ${typeLabel}` : account.kind;
 		row.createSpan({ cls: "nwt-account-kind", text: meta });
 	}
 
